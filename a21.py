@@ -1,17 +1,3 @@
-'''
-python3 -m venv myenv  # Create a virtual environment
-source myenv/bin/activate  # Activate the virtual environment
-pip install ccxt  # Install ccxt
-pip install pandas
-pip install python-telegram-bot
-pip uninstall telegram  # Uninstall the incorrect package
-pip install python-telegram-bot  # Install the correct package
-python3 -m venv myenv
-source myenv/bin/activate
-pip install ccxt pandas python-telegram-bot
-python3 a7.py
-'''
-
 import ccxt
 import pandas as pd
 from datetime import datetime
@@ -216,5 +202,63 @@ def main():
         print(f"\n오류가 발생했습니다: {str(e)}")
         raise
 
+
+import asyncio
+import warnings
+from a2 import find_arbitrage_opportunities
+
+from telegram import Bot
+
+# 텔레그램 알림 클래스
+class TelegramNotifier:
+    def __init__(self, bot_token, chat_id):
+        self.bot = Bot(token=bot_token)
+        self.chat_id = chat_id
+
+    async def send_message(self, message):
+        try:
+            await self.bot.send_message(chat_id=self.chat_id, text=message)
+            print("✅ 메시지가 텔레그램으로 성공적으로 전송되었습니다.")
+        except Exception as e:
+            print(f"❌ 메시지 전송 실패: {e}")
+
+# 비동기 실행 루프
+async def main():
+    # 텔레그램 봇 토큰 및 채널 ID
+    bot_token = "7726714702:AAFfI_Pm4saqRIXPdGr2IUz6nMsHRfrCEF0"
+    chat_id = "-1002431093363"
+
+    notifier = TelegramNotifier(bot_token, chat_id)
+
+    try:
+        while True:
+            print("\n🔍 차익거래 기회 검색 중...")
+            opportunities = find_arbitrage_opportunities()
+
+            if opportunities:
+                # 텔레그램 메시지 포맷팅
+                message = "\n\n".join([
+                    f"💰 *코인*: {op['coin']}\n"
+                    f"📍 *한국 거래소*: {op['korean_exchange']} (KRW: {op['korean_price_krw']}, USD: {op['korean_price_usd']})\n"
+                    f"📍 *해외 거래소*: {op['foreign_exchange']} (USD: {op['foreign_price_usd']})\n"
+                    f"📊 *차익*: {op['difference_percent']:.2f}%\n"
+                    f"📈 *한국 거래량*: {op['korean_volume_krw']}\n"
+                    f"📉 *해외 거래량*: {op['foreign_volume_usd']}"
+                    for op in opportunities[:5]  # 상위 5개만 전송
+                ])
+
+                await notifier.send_message(f"✨ *차익거래 기회 발견!* ✨\n\n{message}")
+            else:
+                await notifier.send_message("현재 차익거래 기회가 없습니다.")
+
+            print("\n⏳ 30초 후 다시 검색합니다...")
+            await asyncio.sleep(30)
+
+    except KeyboardInterrupt:
+        print("\n프로그램을 종료합니다...")
+    except Exception as e:
+        print(f"\n오류 발생: {e}")
+
 if __name__ == "__main__":
-    main()
+    warnings.filterwarnings('ignore')
+    asyncio.run(main())
